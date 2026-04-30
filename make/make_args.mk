@@ -8,7 +8,7 @@
 SYSTEM := windows	
 
 # Названеи проекта
-PROGRAM_NAME := DynamometerStand
+PROGRAM_NAME := ImuDataSender
 
 # Директория с исходным кодом относительно Makefile.mk
 SOURCE_DIR = ../../Embedded

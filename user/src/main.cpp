@@ -85,10 +85,6 @@ using PinRX_t = STM_CppLib::STM_GPIO::GPIO_Pin
 
 STM_CppLib::STM_Usart::Usart1<PinTX_t, PinRX_t> usart1;
 
-// Настройка EXTI на PC1, которое будет программно инициироваться
-STM_CppLib::STM_GPIO::GPIO_Pin_EXTI
-    <STM_CppLib::STM_GPIO::GPIO_Port::PortC, GPIO_PinSource1, send_data_package> pin_pc1;
-
 // Используемые таймеры -------------------------------------------------------
 
 // Таймер для чтения данных датчиков с частотой 200 Гц
@@ -198,8 +194,7 @@ int main()
     // ---------------------------------------------------------------------------
 
     // Изначально добавим FooStage в program_stage_queue
-    // program_stage_queue.put(&FooStage);
-    program_stage_queue.put(&MeasureStage);
+    program_stage_queue.put(&FooStage);
     ProgramStage* current_stage_ptr = &FooStage;
 
     // ---------------------------------------------------------------------------
@@ -245,8 +240,6 @@ void InitAll(){
 
     sensor_L3GD20.Init();
     sensor_LSM303DLHC.Init();
-
-    pin_pc1.InitPinExti();
 
     // Настройка основного таймера с частотой 200 Гц
     uint32_t tim2_period = 50 - 1;
@@ -305,23 +298,13 @@ void MeasureStage_execute(){
         acc_filter.append_value(sensor_LSM303DLHC.acc_data);
         gyro_filter.append_value(sensor_L3GD20.gyro_data);
 
-        // В прерывании обновим данные посылки и отправим её по usart1
-        pin_pc1.GenerateSWInterrupt();
+        data_package.UpdateData();
+        data_package.UpdateControlSum();
+        usart1.SendPackage(data_package);
 
         // Сбросим флаг
         ready_flag = false;
     }
-}
-
-
-// -------------------------------------------------------------------------------
-// Функция отправки пакета данных 
-// (вызывается в прерывании для гарантии целостности данных)
-// -------------------------------------------------------------------------------
-void send_data_package(){
-    data_package.UpdateData();
-    data_package.UpdateControlSum();
-    usart1.SendPackage(data_package);
 }
 
 // -------------------------------------------------------------------------------

@@ -97,8 +97,6 @@ void FooStage_execute();
 void MeasureStage_init();
 void MeasureStage_execute();
 
-void send_data_package(void);
-
 // Функции для отработки поступивших команд
 void restart(void);
 void set_FooStage(void);

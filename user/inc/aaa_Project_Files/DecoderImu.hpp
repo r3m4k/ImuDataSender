@@ -24,8 +24,8 @@
  *************************************************************************** */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __DECODER_IMU_HPP
-#define __DECODER_IMU_HPP
+#ifndef DECODER_IMU_HPP
+#define DECODER_IMU_HPP
 
 /* Includes ------------------------------------------------------------------*/
 #include <stdint.h>
@@ -149,4 +149,4 @@ namespace Decoder{
 
 } // namespace Decoder
 
-#endif /*   __DECODER_IMU_HPP   */
+#endif /*   DECODER_IMU_HPP   */
