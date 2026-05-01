@@ -36,11 +36,6 @@
 #include "CommandProcessing.hpp"
 
 /* Defines -------------------------------------------------------------------*/
-/**
- * @def     ImuCommandType
- * @brief   Байт формата для командного пакета.
- */
-#define ImuCommandType          0xAB
 
 /* Global variables ----------------------------------------------------------*/
 /**
@@ -72,6 +67,12 @@ namespace Decoder{
         static constexpr uint8_t HeaderSecondByte = 0x8C;
 
         /**
+         * @def     ImuCommandType
+         * @brief   Байт формата для командного пакета.
+         */
+        static constexpr uint8_t ImuCommandType = 0xAB;
+
+        /**
          * @brief   Возвращает функцию разбора пакета по байту формата.
          * @param   fmt   Байт формата из пакета.
          * @return  DecodeFunc   Функция-обработчик пакета или nullptr,
@@ -84,7 +85,7 @@ namespace Decoder{
         DecodeFunc get_decode_func(uint8_t fmt){
             switch (fmt){
                 case ImuCommandType: return &process_command_packet;
-                default:             return nullptr;
+                default: return nullptr;
             }
         }
 
