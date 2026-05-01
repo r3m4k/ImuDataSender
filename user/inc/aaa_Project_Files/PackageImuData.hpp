@@ -1,8 +1,8 @@
 /** ****************************************************************************
- * @file    ImuDataPackage.hpp
+ * @file    PackageImuData.hpp
  * @author  Романовский Роман
  * @brief   Формирование пакета данных с акселерометра и гироскопа.
- * @details Содержит класс ImuDataPackage, наследующий BasePackage, для упаковки
+ * @details Содержит класс PackageImuData, наследующий BasePackage, для упаковки
  *          данных с датчиков в бинарный формат, соответствующий протоколу.
  **************************************************************************** */
 
@@ -29,7 +29,7 @@ namespace Packages{
      * @details Наследует BasePackage и формирует бинарный пакет фиксированной
      *          структуры. Использует внешние данные через указатели, переданные в конструктор.
      */
-    class ImuDataPackage: public BasePackage{
+    class PackageImuData: public BasePackage{
     private:
         /**
          * @def     DataFormat
@@ -63,23 +63,23 @@ namespace Packages{
         #pragma pack()
 
         static_assert(sizeof(package_body_t) <= 64,
-              "ImuDataPackage: structure package_body_t exceeds 64 bytes.\n"
+              "PackageImuData: structure package_body_t exceeds 64 bytes.\n"
               "Either increase the buffer size in hw_config.c or reduce the structure size.");
 
     public:
         /**
          * @brief   Конструктор по умолчанию запрещён (требуются указатели на данные).
          */
-        ImuDataPackage() = delete;
+        PackageImuData() = delete;
 
         /**
          * @brief   Конструктор с указателями на внешние данные.
          * @param   _acc_data_ptr   Указатель на объект TriaxialData для акселерометра.
          * @param   _gyro_data_ptr  Указатель на объект TriaxialData для гироскопа.
          * @note    Переданные указатели должны оставаться валидными на всём
-         *          протяжении использования объекта ImuDataPackage.
+         *          протяжении использования объекта PackageImuData.
          */
-        ImuDataPackage(TriaxialData* _acc_data_ptr, TriaxialData* _gyro_data_ptr):
+        PackageImuData(TriaxialData* _acc_data_ptr, TriaxialData* _gyro_data_ptr):
             acc_data_ptr(_acc_data_ptr), gyro_data_ptr(_gyro_data_ptr){
 
             // Последним байтом заголовка необходимо задать длину полезных данных:

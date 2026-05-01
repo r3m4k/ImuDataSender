@@ -14,7 +14,7 @@
 #include "CommandProcessing.hpp"
 #include "Messages.hpp"
 #include "MessagePackage.hpp"
-#include "ImuPackage.hpp"
+#include "PackageImuData.hpp"
 #include "RingBuffer.hpp"
 
 #include "TriaxialData.hpp"
@@ -116,7 +116,7 @@ STM_CppLib::LSM303DLHC  sensor_LSM303DLHC;      // Встроенный датч
 SimpleKalmanFilter<TriaxialData> acc_filter(LSM303DLHC_acc_variance / 50, LSM303DLHC_acc_variance);
 SimpleKalmanFilter<TriaxialData> gyro_filter(L3GD20_gyro_variance   / 50, L3GD20_gyro_variance);
 
-Packages::ImuDataPackage data_package(&acc_filter.filtered_value, &gyro_filter.filtered_value);
+Packages::PackageImuData data_package(&acc_filter.filtered_value, &gyro_filter.filtered_value);
 
 
 /* ****************************************************************************
