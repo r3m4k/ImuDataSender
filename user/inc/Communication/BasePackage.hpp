@@ -42,6 +42,22 @@ namespace Packages{
 
         BasePackage(): data_ptr(nullptr), len(0) {}
         ~BasePackage() = default;
+
+    protected:
+        /**
+         * @brief   Вычисление контрольной суммы пакета.
+         * @return  uint8_t   Сумма всех байтов пакета, кроме байта самой контрольной суммы.
+         * @details Проходит по всем байтам data_ptr,
+         *          накапливает сумму в 16-битной переменной и возвращает младший байт.
+         */
+        uint8_t CountControlSum(){
+            uint16_t crc = 0;
+            // Исключаем последний байт (собственно контрольную сумму)
+            for (uint8_t i = 0; i < len - 1; i++){
+                crc += data_ptr[i];
+            }
+            return static_cast<uint8_t>(crc);
+        }   
     };
 
 } // namespace Packages

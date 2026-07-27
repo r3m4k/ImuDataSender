@@ -62,12 +62,18 @@ extern pHandler __isr_vectors[];
  * Пользовательские переменные
  *************************************************************************** */
 
-// Собственная таблица прерываний
-__attribute__((aligned(128)))    // Cortex-M4 требует выравнивание по 128 байт!
+/**
+ * @brief   RAM-копия таблицы векторов прерываний.
+ * @details 98 векторов занимают 392 байта, поэтому VTOR должен указывать на
+ *          адрес, выровненный по ближайшей большей степени двойки: 512 байт.
+ */
+__attribute__((aligned(512)))
 _user_pHandler _user_vector_table[IST_VECTORS_NUM] = {0};
 
+// ----------------------------------------------------------------------------
+
 // Необходимые счётчик и флаг
-volatile uint32_t tick_counter = 0;
+uint32_t tick_counter = 0;
 volatile bool ready_flag = false;
 
 // Светодиоды на плате
@@ -115,7 +121,7 @@ STM_CppLib::LSM303DLHC  sensor_LSM303DLHC;      // Встроенный датч
 SimpleKalmanFilter<TriaxialData> acc_filter(LSM303DLHC_acc_variance / 50, LSM303DLHC_acc_variance);
 SimpleKalmanFilter<TriaxialData> gyro_filter(L3GD20_gyro_variance   / 50, L3GD20_gyro_variance);
 
-Packages::PackageImuData data_package(&acc_filter.filtered_value, &gyro_filter.filtered_value);
+Packages::PackageImuData data_package(&tick_counter, &acc_filter.filtered_value, &gyro_filter.filtered_value);
 
 
 /* ****************************************************************************
@@ -128,6 +134,8 @@ class ProgramStage{
     
 public:
     bool is_init = false;
+
+    ProgramStage() = delete;
 
     ProgramStage(CommandHandlerFunc _init_func, CommandHandlerFunc _execute_func):
         init_func(_init_func), execute_func(_execute_func) {}
@@ -298,7 +306,6 @@ void MeasureStage_execute(){
         gyro_filter.append_value(sensor_L3GD20.gyro_data);
 
         data_package.UpdateData();
-        data_package.UpdateControlSum();
         usart1.SendPackage(data_package);
 
         // Сбросим флаг
