@@ -75,6 +75,7 @@ INCLUDES = \
 -I"${SOURCE_DIR}/user/inc/Filters" \
 -I"${SOURCE_DIR}/user/inc/Packages" \
 -I"${SOURCE_DIR}/user/inc/Periph" \
+-I"${SOURCE_DIR}/user/inc/ProgramStages" \
 -I"${SOURCE_DIR}/user/inc/Sensors" \
 -I"${SOURCE_DIR}/user/inc/Timers" \
 -I"${SOURCE_DIR}/system/include" \

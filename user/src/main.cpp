@@ -16,6 +16,7 @@
 #include "MessagePackage.hpp"
 #include "PackageImuData.hpp"
 #include "RingBuffer.hpp"
+#include "ProgramStage.hpp"
 
 #include "TriaxialData.hpp"
 #include "SimpleKalmanFilter.hpp"
@@ -123,32 +124,6 @@ SimpleKalmanFilter<TriaxialData> gyro_filter(L3GD20_gyro_variance   / 50, L3GD20
 
 Packages::PackageImuData data_package(&tick_counter, &acc_filter.filtered_value, &gyro_filter.filtered_value);
 
-
-/* ****************************************************************************
- * Описание стадий программы
- *************************************************************************** */
-
-class ProgramStage{
-    CommandHandlerFunc init_func;
-    CommandHandlerFunc execute_func;
-    
-public:
-    bool is_init = false;
-
-    ProgramStage() = delete;
-
-    ProgramStage(CommandHandlerFunc _init_func, CommandHandlerFunc _execute_func):
-        init_func(_init_func), execute_func(_execute_func) {}
-
-    void init(){
-        init_func();
-        is_init = true;
-    }
-
-    void execute(){
-        execute_func();
-    }
-};
 
 // -------------------------------------------------------------------------------
 
