@@ -96,7 +96,7 @@ namespace Decoder{
          * @details Строит view-объект на data-секцию пакета и ищет команду
          *          сначала в списке срочных, затем в списке отложенных:
          *          - срочная команда: если команда требует подтверждения
-         *            (confirm_policy == Required), выполняется
+         *            (confirmation_policy == Required), выполняется
          *            Send_Confirm_Cmd.handler.execute() (блокирующая отправка
          *            в IRQ), затем сразу исполняется обработчик полученной
          *            команды в контексте декодера;
@@ -114,17 +114,17 @@ namespace Decoder{
          *          временный компромисс; перенос в main запланирован вместе
          *          с миграцией USART.
          */
-        static void process_command_packet(const Messages::Message& msg){
+        static void process_command_packet(const BinaryData::MutableByteView& msg){
             // View на data-секцию принятого пакета:
             //   смещение 4 (header 2 + format 1 + length 1),
             //   длина из байта length (bytes_msg[3]).
             const uint8_t data_len = msg.bytes_msg[3];
-            Messages::Message code(&msg.bytes_msg[4], data_len);
+            BinaryData::MutableByteView code(&msg.bytes_msg[4], data_len);
 
             // 1. Срочная команда — подтвердить (если требуется) и исполнить немедленно.
-            const Commands::BaseCommand* urgent = command_manager.find_urgent(code);
+            const Commands::Command* urgent = command_manager.find_urgent(code);
             if (urgent){
-                if (urgent->confirm_policy == Commands::ConfirmPolicy::Required){
+                if (urgent->confirmation_policy == Commands::ConfirmationPolicy::Required){
                     Commands::Send_Confirm_Cmd.handler.execute();
                 }
                 urgent->handler.execute();
@@ -134,9 +134,9 @@ namespace Decoder{
             // 2. Отложенная команда — в очередь сначала подтверждение
             //    (если команда его требует), затем сам обработчик.
             //    Обе записи исполнятся в main.
-            const Commands::BaseCommand* deferred = command_manager.find_deferred(code);
+            const Commands::Command* deferred = command_manager.find_deferred(code);
             if (deferred){
-                if (deferred->confirm_policy == Commands::ConfirmPolicy::Required){
+                if (deferred->confirmation_policy == Commands::ConfirmationPolicy::Required){
                     command_manager.add_to_queue(Commands::Send_Confirm_Cmd);
                 }
                 command_manager.add_to_queue(*deferred);

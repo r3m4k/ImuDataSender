@@ -1,7 +1,3 @@
-/* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __STATIC_QUEUE_HPP
-#define __STATIC_QUEUE_HPP
-
 /** ****************************************************************************
  * @file StaticQueue.hpp
  * @brief Реализация статической циклической очереди фиксированного размера
@@ -21,6 +17,10 @@
  * @author Романовский Роман
  **************************************************************************** */
 
+ /* Define to prevent recursive inclusion -------------------------------------*/
+#ifndef STATIC_QUEUE_HPP
+#define STATIC_QUEUE_HPP
+
 /* Includes ------------------------------------------------------------------*/
 #include <type_traits>
 #include <stdint.h>
@@ -29,70 +29,75 @@
 
 /* Global variables ----------------------------------------------------------*/
 
-/** ****************************************************************************
- * @class StaticQueue
- * @brief Шаблонный класс статической очереди фиксированного размера
- * 
- * @tparam T Тип элементов, хранящихся в очереди
- * @tparam N Максимальное количество элементов в очереди (1-255)
- * 
- * @warning Тип T должен иметь конструктор копирования и оператор присваивания
- *          копированием. Операции перемещения не поддерживаются.
- * 
- * @note Текущая реализация использует сдвиг массива при извлечении элемента,
- *       что приводит к сложности O(n) для операции get(). Для частых операций
- *       извлечения рассмотрите использование кольцевого буфера.
- **************************************************************************** */
+// -----------------------------------------------------------------------------
+namespace Containers{
 
-template <typename T, uint8_t N>
-class StaticQueue{
+    /** ****************************************************************************
+     * @class StaticQueue
+     * @brief Шаблонный класс статической очереди фиксированного размера
+     * 
+     * @tparam T Тип элементов, хранящихся в очереди
+     * @tparam N Максимальное количество элементов в очереди (1-255)
+     * 
+     * @warning Тип T должен иметь конструктор копирования и оператор присваивания
+     *          копированием. Операции перемещения не поддерживаются.
+     * 
+     * @note Текущая реализация использует сдвиг массива при извлечении элемента,
+     *       что приводит к сложности O(n) для операции get(). Для частых операций
+     *       извлечения рассмотрите использование кольцевого буфера.
+     **************************************************************************** */
 
-    // Проверим наличие конструктора копирования у шаблонного типа 
-    // для корректной работы метода get()
-    static_assert(std::is_copy_constructible_v<T>,
-              "Template type T must have copy constructor");
+    template <typename T, uint8_t N>
+    class StaticQueue{
 
-    // Проверим наличие оператора присваивания копированием у шаблонного типа 
-    // для корректной работы метода put()
-    static_assert(std::is_copy_assignable_v<T>,
-              "Template type T must be copy assignable");
+        // Проверим наличие конструктора копирования у шаблонного типа 
+        // для корректной работы метода get()
+        static_assert(std::is_copy_constructible_v<T>,
+                "Template type T must have copy constructor");
 
-    T item_array[N];        // Массив, на основе которого строится очередь
-    uint8_t item_num = 0;   // Число элементов в очереди
+        // Проверим наличие оператора присваивания копированием у шаблонного типа 
+        // для корректной работы метода put()
+        static_assert(std::is_copy_assignable_v<T>,
+                "Template type T must be copy assignable");
 
-public:
+        T item_array[N];        // Массив, на основе которого строится очередь
+        uint8_t item_num = 0;   // Число элементов в очереди
 
-    StaticQueue() = default;
-    ~StaticQueue() = default;
+    public:
 
-    void put(const T& new_item){
-        if (item_num < N){
-            item_array[item_num++] = new_item;
+        StaticQueue() = default;
+        ~StaticQueue() = default;
+
+        void put(const T& new_item){
+            if (item_num < N){
+                item_array[item_num++] = new_item;
+            }
+            else{
+                // TODO: возможно тут надо добавить уведомление пользователя
+                __NOP();
+            }
         }
-        else{
-            // TODO: возможно тут надо добавить уведомление пользователя
-            __NOP();
+
+        T get(){
+            T item = item_array[0];     // Сохраним первый элемент
+
+            // Сдвинем все остальные элементы
+            for (uint8_t i = 1; i < item_num; i++){
+                item_array[i-1] = item_array[i];
+            }
+            item_num--;         // Уменьшим количество элементов
+            return item;        // Вернём сохранённый элемент
         }
-    }
 
-    T get(){
-        T item = item_array[0];     // Сохраним первый элемент
-
-        // Сдвинем все остальные элементы
-        for (uint8_t i = 1; i < item_num; i++){
-            item_array[i-1] = item_array[i];
+        bool is_empty(){
+            return !item_num;
         }
-        item_num--;         // Уменьшим количество элементов
-        return item;        // Вернём сохранённый элемент
-    }
 
-    bool is_empty(){
-        return !item_num;
-    }
+        bool is_full(){
+            return item_num == N;
+        }
+    };
 
-    bool is_full(){
-        return item_num == N;
-    }
-};
+} // namespace Containers
 
-#endif /*   __STATIC_QUEUE_HPP   */
+#endif /*   STATIC_QUEUE_HPP   */

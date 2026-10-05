@@ -1,7 +1,3 @@
-/* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __RING_BUFFER_HPP
-#define __RING_BUFFER_HPP
-
 /** ****************************************************************************
  * @file    RingBuffer.hpp
  * @author  Романовский Роман
@@ -52,6 +48,10 @@
  * @date Апрель 2026
  **************************************************************************** */
 
+ /* Define to prevent recursive inclusion -------------------------------------*/
+#ifndef RING_BUFFER_HPP
+#define RING_BUFFER_HPP
+
 /* Includes ------------------------------------------------------------------*/
 #include <type_traits>
 #include <stdint.h>
@@ -60,128 +60,133 @@
 
 /* Global variables ----------------------------------------------------------*/
 
-/** ****************************************************************************
- * @class   RingBuffer
- * @brief   Кольцевой буфер фиксированного размера для single-context сценария.
- *
- * @tparam  T   Тип элементов, хранящихся в очереди. Должен быть copy
- *              constructible (используется при возврате из get) и copy
- *              assignable (используется в put: buffer[head] = new_item).
- * @tparam  N   Ёмкость буфера в элементах; должна быть >= 1. Все N слотов
- *              доступны одновременно (в отличие от SpscRingBuffer).
- *
- * @warning Класс не предназначен для использования между прерыванием и
- *          основным циклом. Если нужно передавать данные между контекстами,
- *          используйте SpscRingBuffer.
- **************************************************************************** */
-template <typename T, uint32_t N>
-class RingBuffer{
+// -----------------------------------------------------------------------------
+namespace Containers{
 
-    static_assert(N >= 1, "RingBuffer: N must be at least 1");
+    /** ****************************************************************************
+     * @class   RingBuffer
+     * @brief   Кольцевой буфер фиксированного размера для single-context сценария.
+     *
+     * @tparam  T   Тип элементов, хранящихся в очереди. Должен быть copy
+     *              constructible (используется при возврате из get) и copy
+     *              assignable (используется в put: buffer[head] = new_item).
+     * @tparam  N   Ёмкость буфера в элементах; должна быть >= 1. Все N слотов
+     *              доступны одновременно (в отличие от SpscRingBuffer).
+     *
+     * @warning Класс не предназначен для использования между прерыванием и
+     *          основным циклом. Если нужно передавать данные между контекстами,
+     *          используйте SpscRingBuffer.
+     **************************************************************************** */
+    template <typename T, uint32_t N>
+    class RingBuffer{
 
-    static_assert(std::is_copy_constructible_v<T>,
-                  "RingBuffer: T must be copy constructible");
-    static_assert(std::is_copy_assignable_v<T>,
-                  "RingBuffer: T must be copy assignable");
+        static_assert(N >= 1, "RingBuffer: N must be at least 1");
 
-    /// Признак того, что N является степенью двойки — включает fast-path
-    /// с битовой маской вместо оператора %.
-    static constexpr bool is_power_of_two = (N & (N - 1)) == 0;
+        static_assert(std::is_copy_constructible_v<T>,
+                    "RingBuffer: T must be copy constructible");
+        static_assert(std::is_copy_assignable_v<T>,
+                    "RingBuffer: T must be copy assignable");
 
-    T buffer[N];                ///< Массив-хранилище элементов
-    uint32_t head       = 0;    ///< Индекс слота для следующей записи
-    uint32_t tail       = 0;    ///< Индекс слота для следующего чтения
-    uint32_t item_count = 0;    ///< Текущее число элементов в буфере
+        /// Признак того, что N является степенью двойки — включает fast-path
+        /// с битовой маской вместо оператора %.
+        static constexpr bool is_power_of_two = (N & (N - 1)) == 0;
 
-    /**
-     * @brief   Переход через границу буфера: возврат (idx + 1) mod N.
-     * @details Если N — степень двойки, используется битовая маска
-     *          (одна инструкция AND на Cortex-M4). Иначе используется
-     *          оператор %, который в debug-сборке (-O0) превращается
-     *          в вызов __aeabi_uidivmod (~30+ тактов).
-     *          Выбор ветки происходит на этапе компиляции через
-     *          if constexpr — в машинном коде остаётся только одна ветка.
-     */
-    static constexpr uint32_t advance(uint32_t idx){
-        if constexpr (is_power_of_two){
-            return (idx + 1) & (N - 1);
-        } else {
-            return (idx + 1) % N;
-        }
-    }
+        T buffer[N];                ///< Массив-хранилище элементов
+        uint32_t head       = 0;    ///< Индекс слота для следующей записи
+        uint32_t tail       = 0;    ///< Индекс слота для следующего чтения
+        uint32_t item_count = 0;    ///< Текущее число элементов в буфере
 
-public:
-
-    /**
-     * @brief   Конструктор по умолчанию.
-     */
-    RingBuffer() = default;
-
-    /**
-     * @brief   Деструктор по умолчанию.
-     */
-    ~RingBuffer() = default;
-
-    /**
-     * @brief   Копирование и перемещение запрещены.
-     * @details Согласуется со стилем остальных контейнеров проекта
-     *          (StaticQueue, SpscRingBuffer).
-     */
-    RingBuffer(const RingBuffer&)            = delete;
-    RingBuffer& operator=(const RingBuffer&) = delete;
-    RingBuffer(RingBuffer&&)                 = delete;
-    RingBuffer& operator=(RingBuffer&&)      = delete;
-
-    /**
-     * @brief   Добавление элемента в очередь.
-     * @param   new_item   Элемент для помещения в очередь.
-     * @return  true, если элемент добавлен; false, если очередь заполнена.
-     * @details O(1). Переход через границу буфера — см. advance().
-     */
-    bool put(const T& new_item){
-        if (item_count == N){
-            return false;
+        /**
+         * @brief   Переход через границу буфера: возврат (idx + 1) mod N.
+         * @details Если N — степень двойки, используется битовая маска
+         *          (одна инструкция AND на Cortex-M4). Иначе используется
+         *          оператор %, который в debug-сборке (-O0) превращается
+         *          в вызов __aeabi_uidivmod (~30+ тактов).
+         *          Выбор ветки происходит на этапе компиляции через
+         *          if constexpr — в машинном коде остаётся только одна ветка.
+         */
+        static constexpr uint32_t advance(uint32_t idx){
+            if constexpr (is_power_of_two){
+                return (idx + 1) & (N - 1);
+            } else {
+                return (idx + 1) % N;
+            }
         }
 
-        buffer[head] = new_item;
-        head = advance(head);
-        item_count++;
-        return true;
-    }
+    public:
 
-    /**
-     * @brief   Извлечение элемента из очереди.
-     * @return  T   Копия извлечённого элемента.
-     *
-     * @warning Предварительная проверка is_empty() обязательна. Вызов get()
-     *          на пустой очереди — UB на уровне логики (на уровне памяти
-     *          вернётся устаревшее содержимое слота buffer[tail]).
-     *          Поведение идентично StaticQueue::get() и SpscRingBuffer::get().
-     *
-     * @details O(1).
-     */
-    T get(){
-        T item = buffer[tail];
-        tail = advance(tail);
-        item_count--;
-        return item;
-    }
+        /**
+         * @brief   Конструктор по умолчанию.
+         */
+        RingBuffer() = default;
 
-    /**
-     * @brief   Проверка, пуста ли очередь.
-     * @return  true, если в очереди нет элементов.
-     */
-    bool is_empty() const {
-        return item_count == 0;
-    }
+        /**
+         * @brief   Деструктор по умолчанию.
+         */
+        ~RingBuffer() = default;
 
-    /**
-     * @brief   Проверка, заполнена ли очередь.
-     * @return  true, если в очереди ровно N элементов.
-     */
-    bool is_full() const {
-        return item_count == N;
-    }
-};
+        /**
+         * @brief   Копирование и перемещение запрещены.
+         * @details Согласуется со стилем остальных контейнеров проекта
+         *          (StaticQueue, SpscRingBuffer).
+         */
+        RingBuffer(const RingBuffer&)            = delete;
+        RingBuffer& operator=(const RingBuffer&) = delete;
+        RingBuffer(RingBuffer&&)                 = delete;
+        RingBuffer& operator=(RingBuffer&&)      = delete;
 
-#endif /*   __RING_BUFFER_HPP   */
+        /**
+         * @brief   Добавление элемента в очередь.
+         * @param   new_item   Элемент для помещения в очередь.
+         * @return  true, если элемент добавлен; false, если очередь заполнена.
+         * @details O(1). Переход через границу буфера — см. advance().
+         */
+        bool put(const T& new_item){
+            if (item_count == N){
+                return false;
+            }
+
+            buffer[head] = new_item;
+            head = advance(head);
+            item_count++;
+            return true;
+        }
+
+        /**
+         * @brief   Извлечение элемента из очереди.
+         * @return  T   Копия извлечённого элемента.
+         *
+         * @warning Предварительная проверка is_empty() обязательна. Вызов get()
+         *          на пустой очереди — UB на уровне логики (на уровне памяти
+         *          вернётся устаревшее содержимое слота buffer[tail]).
+         *          Поведение идентично StaticQueue::get() и SpscRingBuffer::get().
+         *
+         * @details O(1).
+         */
+        T get(){
+            T item = buffer[tail];
+            tail = advance(tail);
+            item_count--;
+            return item;
+        }
+
+        /**
+         * @brief   Проверка, пуста ли очередь.
+         * @return  true, если в очереди нет элементов.
+         */
+        bool is_empty() const {
+            return item_count == 0;
+        }
+
+        /**
+         * @brief   Проверка, заполнена ли очередь.
+         * @return  true, если в очереди ровно N элементов.
+         */
+        bool is_full() const {
+            return item_count == N;
+        }
+    };
+    
+} // namespace Containers
+
+#endif /*   RING_BUFFER_HPP   */

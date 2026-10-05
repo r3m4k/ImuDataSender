@@ -1,54 +1,49 @@
 /** ***************************************************************************
- * @file    Message.hpp
+ * @file    MutableByteView.hpp
  * @author  Романовский Роман
  * @brief   Универсальный контейнер сообщения + наследник с собственным буфером.
  *
  * @details Классы для работы с сообщениями произвольной длины:
- *          - Message — базовый контейнер, не владеющий буфером напрямую.
+ *          - MutableByteView — базовый контейнер, не владеющий буфером напрямую.
  *            Хранит указатель на внешний буфер и текущий размер значащих
- *            данных. Используется как тип приёма по ссылке (const Message&)
+ *            данных. Используется как тип приёма по ссылке (const MutableByteView&)
  *            для сообщений любого размера.
- *          - SizedMessage<N> — наследник с собственным буфером фиксированной
+ *          - StaticByteBuffer<N> — наследник с собственным буфером фиксированной
  *            длины N байт.
  *************************************************************************** */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef MESSAGE_HPP
-#define MESSAGE_HPP
+#ifndef BINARY_DATA_HPP
+#define BINARY_DATA_HPP
 
 /* Includes ------------------------------------------------------------------*/
 #include <stdint.h>
 #include <string.h>
 
 /* Defines -------------------------------------------------------------------*/
-/**
- * @def     VCP_BUFFER_SIZE
- * @brief   Размер буфера, используемого в hw_config.c
- */
-#define VCP_BUFFER_SIZE      64
 
 /* Global variables ----------------------------------------------------------*/
 
 // -----------------------------------------------------------------------------
-namespace Messages{
+namespace BinaryData{
 
     /**
      * @brief   Базовый контейнер сообщения, без владения буфером.
      * @details Хранит указатель на внешний буфер и текущий размер значащих
      *          данных. Сам буфер, его обнуление и безопасное копирование
-     *          находятся в наследнике (SizedMessage<N>).
+     *          находятся в наследнике (StaticByteBuffer<N>).
      * @note    Время жизни буфера должно перекрывать время жизни объекта.
      *          Класс не выполняет аллокаций.
      */
-    class Message{
+    class MutableByteView{
     public:
         uint8_t* bytes_msg = nullptr;   ///< Указатель на буфер
         uint8_t msg_size = 0;           ///< Фактический размер данных
 
         /**
-         * @brief   Конструктор по умолчанию запрещён — Message без буфера невалиден.
+         * @brief   Конструктор по умолчанию запрещён — MutableByteView без буфера невалиден.
          */
-        Message() = delete;
+        MutableByteView() = delete;
 
         /**
          * @brief   Конструктор с привязкой к внешнему буферу.
@@ -56,7 +51,7 @@ namespace Messages{
          * @note    Данные не копируются. buf должен оставаться валидным
          *          всё время жизни объекта. msg_size не изменяется (0 по умолчанию).
          */
-        explicit Message(uint8_t* buf): bytes_msg(buf) {}
+        explicit MutableByteView(uint8_t* buf): bytes_msg(buf) {}
 
         /**
          * @brief   Конструктор-view с указанием размера значащих данных.
@@ -65,24 +60,24 @@ namespace Messages{
          * @note    Данные не копируются. Используется для построения view
          *          на готовый участок (например, data-секцию принятого пакета).
          */
-        Message(uint8_t* buf, uint8_t size): bytes_msg(buf), msg_size(size) {}
+        MutableByteView(uint8_t* buf, uint8_t size): bytes_msg(buf), msg_size(size) {}
 
         /**
          * @brief   Деструктор по умолчанию.
          */
-        ~Message() = default;
+        ~MutableByteView() = default;
 
         /**
          * @brief   Move-операции запрещены (класс не поддерживает move-семантику).
          */
-        Message(Message&&) noexcept = delete;
-        Message& operator=(Message&&) noexcept = delete;
+        MutableByteView(MutableByteView&&) noexcept = delete;
+        MutableByteView& operator=(MutableByteView&&) noexcept = delete;
 
         /**
          * @brief   Оператор сравнения двух сообщений.
          * @return  true, если размеры и содержимое совпадают.
          */
-        bool operator==(const Message& other) const {
+        bool operator==(const MutableByteView& other) const {
             if (msg_size != other.msg_size) return false;
             return memcmp(bytes_msg, other.bytes_msg, msg_size) == 0;
         }
@@ -102,28 +97,28 @@ namespace Messages{
 
     /**
      * @brief   Сообщение с собственным буфером фиксированной длины.
-     * @tparam  N   Ёмкость буфера в байтах.
-     * @details Наследник Message, владеющий буфером-массивом. Предоставляет
+     * @tparam  Capacity   Ёмкость буфера в байтах.
+     * @details Наследник MutableByteView, владеющий буфером-массивом. Предоставляет
      *          операции, требующие знания размера буфера (clear, operator=).
      *          Доступ к полям bytes_msg/msg_size — через унаследованные поля базы.
      */
-    template<uint8_t N>
-    class SizedMessage: public Message{
-        uint8_t buffer[N] = {0};   ///< Собственный буфер фиксированного размера
+    template<uint8_t Capacity>
+    class StaticByteBuffer: public MutableByteView{
+        uint8_t buffer[Capacity] = {0};   ///< Собственный буфер фиксированного размера
 
     public:
         /**
          * @brief   Конструктор по умолчанию. Буфер инициализируется нулями.
          */
-        SizedMessage(): Message(buffer) {}
+        StaticByteBuffer(): MutableByteView(buffer) {}
 
         /**
          * @brief   Конструктор, копирующий данные из внешнего буфера.
          * @param   src    Указатель на источник данных.
          * @param   size   Количество байт для копирования (не более N).
          */
-        SizedMessage(const uint8_t* src, uint8_t size): Message(buffer) {
-            if (size > N) size = N;
+        StaticByteBuffer(const uint8_t* src, uint8_t size): MutableByteView(buffer) {
+            if (size > Capacity) size = Capacity;
             msg_size = size;
             memcpy(buffer, src, size);
         }
@@ -131,7 +126,7 @@ namespace Messages{
         /**
          * @brief   Конструктор копирования.
          */
-        SizedMessage(const SizedMessage& other): Message(buffer) {
+        StaticByteBuffer(const StaticByteBuffer& other): MutableByteView(buffer) {
             msg_size = other.msg_size;
             memcpy(buffer, other.bytes_msg, msg_size);
         }
@@ -141,9 +136,9 @@ namespace Messages{
          * @details Защита от переполнения: если other.msg_size превышает N,
          *          копируется не более N байт.
          */
-        SizedMessage& operator=(const SizedMessage& other) {
+        StaticByteBuffer& operator=(const StaticByteBuffer& other) {
             if (this != &other) {
-                uint8_t n = (other.msg_size <= N) ? other.msg_size : N;
+                uint8_t n = (other.msg_size <= Capacity) ? other.msg_size : Capacity;
                 memcpy(buffer, other.bytes_msg, n);
                 msg_size = n;
             }
@@ -153,23 +148,23 @@ namespace Messages{
         /**
          * @brief   Move-операции запрещены (класс не поддерживает move-семантику).
          */
-        SizedMessage(SizedMessage&&) noexcept = delete;
-        SizedMessage& operator=(SizedMessage&&) noexcept = delete;
+        StaticByteBuffer(StaticByteBuffer&&) noexcept = delete;
+        StaticByteBuffer& operator=(StaticByteBuffer&&) noexcept = delete;
 
         /**
          * @brief   Очистка сообщения – заполняет весь буфер нулями.
          */
         void clear() {
-            memset(buffer, 0, N);
+            memset(buffer, 0, Capacity);
             msg_size = 0;
         }
 
         /**
          * @brief   Деструктор по умолчанию.
          */
-        ~SizedMessage() = default;
+        ~StaticByteBuffer() = default;
     };
 
-} // namespace Message
+} // namespace MutableByteView
 
-#endif /*   MESSAGE_HPP   */
+#endif /*   BINARY_DATA_HPP   */

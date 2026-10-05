@@ -157,9 +157,9 @@ namespace STM_CppLib{
 
         /**
          * @brief   Отправка сообщения фиксированной длины.
-         * @param   message   Ссылка на объект Message.
+         * @param   message   Ссылка на объект MutableByteView.
          */
-        void SendMessage(Messages::Message& message){
+        void SendMessage(BinaryData::MutableByteView& message){
             SendBuffer(message.bytes_msg, message.msg_size);
         }
     };

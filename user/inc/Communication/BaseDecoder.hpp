@@ -30,7 +30,7 @@
 #include <stdint.h>
 
 #include "main.h"
-#include "Messages.hpp"
+#include "BinaryData.hpp"
 
 /* Defines -------------------------------------------------------------------*/
 
@@ -41,12 +41,21 @@
 namespace Decoder{
 
     /**
+     * @brief   Максимальная ёмкость буфера декодера в байтах.
+     * @details Определяет максимальный размер полного принимаемого пакета, включая
+     *          заголовок, байт формата, длину данных, сами данные и контрольную
+     *          сумму. Значение согласовано с максимальным размером приёмного
+     *          буфера USB VCP, равным 64 байтам.
+     */
+    inline constexpr uint8_t MAX_CAPACITY = 64;
+    
+    /**
      * @brief   Тип функции декодирования полученного пакета.
      * @details Принимает ссылку на собранное сообщение и выполняет
      *          специфичные для формата действия (передача в менеджер команд,
      *          обработку телеметрии и т.п.). Возвращаемое значение не требуется.
      */
-    using DecodeFunc = void (*)(const Messages::Message&);
+    using DecodeFunc = void (*)(const BinaryData::MutableByteView&);
 
     /**
      * @brief   Состояния конечного автомата разбора пакета.
@@ -86,8 +95,8 @@ namespace Decoder{
     class BaseDecoder{
 
     protected:
-        Messages::SizedMessage<VCP_BUFFER_SIZE> current_message;   ///< Текущее собираемое сообщение
-        DecoderStages decode_stage = DecoderStages::WantHeader;     ///< Текущее состояние автомата
+        BinaryData::StaticByteBuffer<MAX_CAPACITY> current_message;   ///< Текущее собираемое сообщение
+        DecoderStages decode_stage = DecoderStages::WantHeader;          ///< Текущее состояние автомата
         
         DecodeFunc decode_func  = nullptr;      ///< Функция декодирования текущего пакета
         uint8_t byte_index = 0;                 ///< Индекс следующего байта в current_message

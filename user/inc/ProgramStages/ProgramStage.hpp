@@ -25,7 +25,7 @@ namespace ProgramStages{
 
     /**
      * @brief   Класс для описание стадии программы и управлением ею.
-     * @details Хранит в себе два указателя на CommandHandlerFunc: 
+     * @details Хранит в себе два указателя на CommandCallback: 
      *          - init_func (функция инициализации стадии);
      *          - execute_func (функция отработки стадии).
      *          Также хранится флаг is_init, который нужен для отслеживания
@@ -41,15 +41,15 @@ namespace ProgramStages{
      * @endcode
      */
     class ProgramStage{
-        CommandHandlerFunc init_func;
-        CommandHandlerFunc execute_func;
+        CommandCallback init_func;
+        CommandCallback execute_func;
         
     public:
         bool is_init = false;
 
         ProgramStage() = delete;
 
-        ProgramStage(CommandHandlerFunc _init_func, CommandHandlerFunc _execute_func):
+        ProgramStage(CommandCallback _init_func, CommandCallback _execute_func):
             init_func(_init_func), execute_func(_execute_func) {}
 
         void init(){

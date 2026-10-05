@@ -111,13 +111,9 @@ namespace Packages{
             // Установим поля базового класса. Фактическая длина пакета:
             // 4 байта header + msg_size байт текста + 1 байт control_sum.
             data_ptr = reinterpret_cast<uint8_t*>(&package_body);
-            len      = static_cast<uint8_t>(4 + msg_size + 1);
+            len = static_cast<uint8_t>(4 + msg_size + 1);
 
             // Позиция контрольной суммы внутри буфера — сразу за текстом.
-            // Предварительно обнулим этот слот, чтобы он корректно учёлся
-            // в сумме (CountControlSum суммирует len-1 байт, и до его вызова
-            // в слоте control_sum должен лежать 0).
-            data_ptr[len - 1] = 0;
             data_ptr[len - 1] = CountControlSum();
         }
 

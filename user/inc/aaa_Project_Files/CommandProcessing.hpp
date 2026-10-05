@@ -5,8 +5,8 @@
  *
  * @details Регистрирует поддерживаемые команды и предоставляет менеджер
  *          для их сопоставления и выполнения. Структурные классы команд
- *          (CommandHandler, BaseCommand, Command<N>, ByteCommand<N>,
- *          StringCommand<N>) определены в CommandStructure.hpp.
+ *          (CommandHandler, Command, Command<N>, ByteCommand<N>,
+ *          TextCommand<N>) определены в CommandStructure.hpp.
  *
  *          Поддерживаются два вида команд:
  *          - Срочные (urgent) — выполняются немедленно в контексте декодера
@@ -15,7 +15,7 @@
  *            в основном цикле программы.
  *
  *          В этом файле определены:
- *          - inline-объекты ByteCommand/StringCommand (поддерживаемые команды);
+ *          - inline-объекты ByteCommand/TextCommand (поддерживаемые команды);
  *          - CommandManager — контейнер со списками urgent/deferred команд
  *                             и очередью для отложенного исполнения.
  *************************************************************************** */
@@ -45,44 +45,44 @@ namespace Commands{
     /*!
      * @defgroup SupportedCommands Поддерживаемые команды
      * @brief    Глобальные объекты команд, регистрируемые в CommandManager.
-     * @details  Каждая команда — inline-объект ByteCommand<N> или StringCommand<N>
+     * @details  Каждая команда — inline-объект ByteCommand<N> или TextCommand<N>
      * @{
      */
 
     /**
      * @brief   Срочная команда: перезагрузка микроконтроллера.
      */
-    inline ByteCommand Restart_Cmd({0xff, 0xff}, restart, ConfirmPolicy::Required);
+    inline ByteCommand Restart_Cmd({0xff, 0xff}, restart, ConfirmationPolicy::Required);
 
     /**
      * @brief   Отложенная команда: переход в стадию FooStage.
      */
-    inline ByteCommand Set_FooStage_Cmd({0xaa, 0x01}, set_FooStage, ConfirmPolicy::Required);
+    inline ByteCommand Set_FooStage_Cmd({0xaa, 0x01}, set_FooStage, ConfirmationPolicy::Required);
 
     /**
      * @brief   Отложенная команда: переход в стадию MeasureStage.
      */
-    inline ByteCommand Set_MeasureStage_Cmd({0xaa, 0x02}, set_MeasureStage, ConfirmPolicy::Required);
+    inline ByteCommand Set_MeasureStage_Cmd({0xaa, 0x02}, set_MeasureStage, ConfirmationPolicy::Required);
 
     /**
      * @brief   Отложенная команда: отправка подтверждения приёма.
      */
-    inline StringCommand Send_Confirm_Cmd("CONFIRM", send_confirm_msg, ConfirmPolicy::NotRequired);
+    inline TextCommand Send_Confirm_Cmd("CONFIRM", send_confirm_msg, ConfirmationPolicy::NotRequired);
 
     /**
      * @brief   Отложенная команда: отправка ack на handshake.
      */
-    inline StringCommand Send_Handshake_Ack_Cmd("HANDSHAKE_REQ", send_handshake_ack, ConfirmPolicy::NotRequired);
+    inline TextCommand Send_Handshake_Ack_Cmd("HANDSHAKE_REQ", send_handshake_ack, ConfirmationPolicy::NotRequired);
 
     /**
      * @brief   Отложенная команда: отправка ack на heartbeat.
      */
-    inline StringCommand Send_Heartbeat_Ack_Cmd("HEARTBEAT_REQ", send_heartbeat_ack, ConfirmPolicy::NotRequired);
+    inline TextCommand Send_Heartbeat_Ack_Cmd("HEARTBEAT_REQ", send_heartbeat_ack, ConfirmationPolicy::NotRequired);
 
     /**
      * @brief   Системная команда: отправка сообщения об ошибке.
      */
-    inline StringCommand Send_Error_Cmd("UNKNOWN_COMMAND", send_error_msg, ConfirmPolicy::NotRequired);
+    inline TextCommand Send_Error_Cmd("UNKNOWN_COMMAND", send_error_msg, ConfirmationPolicy::NotRequired);
 
     /** @} */ // SupportedCommands
 
@@ -90,11 +90,11 @@ namespace Commands{
 
     /**
      * @brief   Менеджер поддерживаемых команд.
-     * @details Хранит два статических списка указателей на BaseCommand:
+     * @details Хранит два статических списка указателей на Command:
      *          urgent_commands (исполняются в IRQ-контексте немедленно)
      *          и deferred_commands (помещаются в очередь для исполнения в main).
      *          Также владеет очередью CommandHandler для отложенных команд.
-     * @note    При добавлении новой команды (ByteCommand или StringCommand)
+     * @note    При добавлении новой команды (ByteCommand или TextCommand)
      *          не забыть включить её в соответствующий массив ниже.
      */
     class CommandManager{
@@ -102,14 +102,14 @@ namespace Commands{
         /**
          * @brief   Список срочных команд (исполняются в контексте декодера).
          */
-        inline static const BaseCommand* urgent_commands[] = {
+        inline static const Command* urgent_commands[] = {
             &Restart_Cmd
         };
 
         /**
          * @brief   Список отложенных команд (помещаются в очередь).
          */
-        inline static const BaseCommand* deferred_commands[] = {
+        inline static const Command* deferred_commands[] = {
             &Set_FooStage_Cmd,
             &Set_MeasureStage_Cmd,
             &Send_Confirm_Cmd,
@@ -123,15 +123,15 @@ namespace Commands{
          *          USART IRQ (через DecoderImu::process_command_packet),
          *          get() — из основного цикла main.
          */
-        SpscRingBuffer<CommandHandler, 8> command_queue;
+        Containers::SpscRingBuffer<CommandHandler, 8> command_queue;
 
         /**
          * @brief   Поиск срочной команды по коду.
          * @param   code   View на байты кода (обычно data-секция пакета).
-         * @return  Указатель на найденную BaseCommand или nullptr.
+         * @return  Указатель на найденную Command или nullptr.
          */
-        const BaseCommand* find_urgent(const Messages::Message& code) const {
-            for (const BaseCommand* cmd : urgent_commands){
+        const Command* find_urgent(const BinaryData::MutableByteView& code) const {
+            for (const Command* cmd : urgent_commands){
                 if (cmd->code == code){
                     return cmd;
                 }
@@ -142,10 +142,10 @@ namespace Commands{
         /**
          * @brief   Поиск отложенной команды по коду.
          * @param   code   View на байты кода (обычно data-секция пакета).
-         * @return  Указатель на найденную BaseCommand или nullptr.
+         * @return  Указатель на найденную Command или nullptr.
          */
-        const BaseCommand* find_deferred(const Messages::Message& code) const {
-            for (const BaseCommand* cmd : deferred_commands){
+        const Command* find_deferred(const BinaryData::MutableByteView& code) const {
+            for (const Command* cmd : deferred_commands){
                 if (cmd->code == code){
                     return cmd;
                 }
@@ -159,7 +159,7 @@ namespace Commands{
          *                    в очередь).
          * @return  true, если команда добавлена; false, если очередь заполнена.
          */
-        bool add_to_queue(const BaseCommand& command){
+        bool add_to_queue(const Command& command){
             return command_queue.put(command.handler);
         }
     };
