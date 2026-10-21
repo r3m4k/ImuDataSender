@@ -174,6 +174,49 @@ namespace Containers{
         }
 
         /**
+         * @brief   Добавление массива целиком либо отказ без изменения очереди.
+         * @param   items   Источник элементов; может быть nullptr при count == 0.
+         * @param   count   Количество добавляемых элементов.
+         * @return  true при добавлении всего массива; false при нехватке места
+         *          или невалидном указателе на непустой массив.
+         * @note    Вызывается только из контекста единственного producer,
+         *          как и put(). Источник должен содержать count элементов.
+         * @details Consumer видит новые элементы после единственной публикации
+         *          head. Во время копирования он может освобождать старые слоты,
+         *          поэтому предварительно проверенного места всегда достаточно.
+         */
+        bool put_buffer(const T* items, uint32_t count){
+            if (count == 0){ return true; }
+            if (items == nullptr){ return false; }
+
+            uint32_t head_local = head.load(std::memory_order_relaxed);
+            const uint32_t tail_local = tail.load(std::memory_order_acquire);
+            const uint32_t available = (tail_local - head_local - 1U) & mask;
+            if (count > available){ return false; }
+
+            for (uint32_t i = 0; i < count; i++){
+                buffer[head_local] = items[i];
+                head_local = (head_local + 1U) & mask;
+            }
+
+            head.store(head_local, std::memory_order_release);
+            return true;
+        }
+
+        /**
+         * @brief   Количество свободных слотов со стороны producer.
+         * @return  Число от 0 до N - 1.
+         * @note    Вызывается из контекста единственного producer. Consumer
+         *          может освободить дополнительные слоты после чтения tail;
+         *          возвращённое значение является консервативной оценкой.
+         */
+        uint32_t free_space() const {
+            const uint32_t head_local = head.load(std::memory_order_relaxed);
+            const uint32_t tail_local = tail.load(std::memory_order_acquire);
+            return (tail_local - head_local - 1U) & mask;
+        }
+
+        /**
          * @brief   Извлечение элемента из очереди (consumer).
          * @return  T   Копия извлечённого элемента.
          *
