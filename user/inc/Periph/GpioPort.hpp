@@ -44,7 +44,7 @@ namespace STM_CppLib{
              * @return  Указатель на структуру GPIOx (например, GPIOA, GPIOB и т.д.).
              * @note    Если порт не распознан, возвращает nullptr.
              */
-            static constexpr GPIO_TypeDef* get_GPIO_Type() {
+            static GPIO_TypeDef* get_GPIO_Type() {
                 switch(port) {
                     case GPIO_Port::PortA: return GPIOA;
                     case GPIO_Port::PortB: return GPIOB;
@@ -72,8 +72,6 @@ namespace STM_CppLib{
                     default: return 0xFFFF;
                 }
             }();
-        
-
         };
 
     } // namespace STM_GPIO

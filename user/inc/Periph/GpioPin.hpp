@@ -22,7 +22,7 @@
 #include "Consts.hpp"
 #include "Exti.hpp"
 #include "GpioPort.hpp"
-#include "BaseIRQDevice.hpp"
+#include "ExtiIRQ.hpp"
 
 /* Defines -------------------------------------------------------------------*/
 
@@ -138,70 +138,97 @@ namespace STM_CppLib{
          * @tparam  port                   Порт GPIO.
          * @tparam  pin_source             Номер вывода.
          * @tparam  external_irq_handler   Функция-обработчик прерывания (тип handler_t), вызываемая при срабатывании EXTI.
-         * @details Наследует функциональность GPIO_Pin, а также интерфейсы настройки EXTI и базового CRTP-класса
-         *          для прерываний. Позволяет одной командой инициализировать пин, настроить EXTI и NVIC.
+         * @details Наследует функциональность GPIO_Pin и настройки EXTI. Содержит объект
+         *          регистрации GPIO_EXTI_n для совместной работы линий с общим IRQ.
+         *          Позволяет одной командой инициализировать пин, настроить EXTI и NVIC.
          * @note    Для корректной работы необходимо, чтобы EXTI_Descriptor<port, pin_source> предоставлял
          *          корректные параметры источника порта и номер вектора прерывания.
-         * @note    Очистка флага EXTI выполняется автоматически после вызова пользовательского обработчика.
+         * @note    Объект должен существовать всё время работы IRQ. Копирование и перемещение запрещены.
+         *          Очистка флага EXTI выполняется диспетчером перед вызовом пользовательского обработчика.
          */
         template <GPIO_Port port, uint8_t pin_source, handler_t external_irq_handler>
         class GPIO_Pin_EXTI: 
             public GPIO_Pin<port, pin_source>,
 
-            public STM_EXTI::GPIO_EXTI<
-                        STM_EXTI::EXTI_Descriptor<port, pin_source>::PortSource, pin_source>, 
-
-            public BaseIRQDevice<GPIO_Pin_EXTI<port, pin_source, external_irq_handler>, 
-                                    STM_EXTI::EXTI_Descriptor<port, pin_source>::IRQn>
+            public STM_EXTI::GPIO_EXTI<STM_EXTI::EXTI_Descriptor<port, pin_source>::PortSource, pin_source>
         {
+            static_assert(pin_source < 16, "EXTI line must be from 0 to 15!");
+            static_assert(external_irq_handler != nullptr, "EXTI handler can not be nullptr");
+
+            // Приватный объект для регистрации прерывания
+            STM_EXTI::GPIO_EXTI_n<GPIO_Pin_EXTI> irq_registration;
 
         public:
             /**
-             * @brief   Конструктор. Регистрирует текущий экземпляр как обработчик прерывания.
-             * @details Устанавливает статический указатель irq_device_ptr (унаследованный от BaseIRQDevice)
-             *          на данный объект, что позволяет статическому обработчику вызывать метод irq_handler()
-             *          именно этого экземпляра.
+             * @brief   Создаёт объект пина и его регистрации без настройки аппаратуры.
              */
-            GPIO_Pin_EXTI(){
-                this->irq_device_ptr = this;
-            }
+            GPIO_Pin_EXTI() = default;
 
             /**
              * @brief   Полная инициализация пина с поддержкой EXTI.
-             * @param   GPIO_Mode               Режим работы вывода (по умолчанию GPIO_Mode_IN).
-             * @param   GPIO_PuPd                Тип подтяжки (по умолчанию GPIO_PuPd_DOWN).
-             * @param   GPIO_InitStructure_ptr   Указатель на структуру инициализации GPIO (или nullptr).
-             * @param   EXTI_InitStructure_ptr   Указатель на структуру инициализации EXTI (или nullptr).
-             * @param   NVIC_InitStructure_ptr   Указатель на структуру инициализации NVIC (или nullptr).
-             * @details Последовательно вызывает:
-             *          - InitPin() базового класса для настройки GPIO;
-             *          - InitExti() из класса GPIO_EXTI для настройки EXTI;
-             *          - InitInterrupt() из BaseIRQDevice для настройки NVIC и регистрации обработчика.
+             * @param   GPIO_Mode                 Режим работы вывода (по умолчанию GPIO_Mode_IN).
+             * @param   GPIO_PuPd                 Тип подтяжки (по умолчанию GPIO_PuPd_NOPULL).
+             * @param   GPIO_Speed                Скорость работы вывода.
+             * @param   GPIO_OType                Тип выхода.
+             * @param   EXTI_InitStructure_ptr    Указатель на структуру инициализации EXTI (или nullptr).
+             * @param   NVIC_InitStructure_ptr    Указатель на структуру инициализации NVIC (или nullptr).
+             * @return  false при конфликте регистрации или несовпадении линии/IRQ в настройках.
+             * @details Регистрирует обработчик, настраивает GPIO, включает тактирование SYSCFG
+             *          и настраивает EXTI. При конфликте настройки аппаратуры не изменяются.
+             * @note    Вызывать из основного кода после создания объекта. Прежнее состояние
+             *          маски прерываний восстанавливается после завершения настройки.
              */
-            void InitPinExti(
-                GPIOMode_TypeDef GPIO_Mode = GPIO_Mode_OUT,
+            bool InitPinExti(
+                GPIOMode_TypeDef GPIO_Mode = GPIO_Mode_IN,
                 GPIOPuPd_TypeDef GPIO_PuPd = GPIO_PuPd_NOPULL,
                 GPIOSpeed_TypeDef GPIO_Speed = GPIO_Speed_50MHz,
                 GPIOOType_TypeDef GPIO_OType = GPIO_OType_PP,
                 EXTI_InitTypeDef* EXTI_InitStructure_ptr = nullptr,
                 NVIC_InitTypeDef* NVIC_InitStructure_ptr = nullptr
             ){
-                
+                if ((EXTI_InitStructure_ptr != nullptr) &&
+                    (EXTI_InitStructure_ptr->EXTI_Line != static_cast<uint32_t>(pin_source))){
+                    return false;
+                }
+
+                const uint32_t primask = __get_PRIMASK();
+                __disable_irq();
+
+                if (!irq_registration.InitInterrupt(NVIC_InitStructure_ptr)){
+                    __set_PRIMASK(primask);
+                    return false;
+                }
+
+                // Инициализация пина
                 this->InitPin(GPIO_Mode, GPIO_PuPd, GPIO_Speed, GPIO_OType);
+                // Активация тактирования блока SYSCFG, необходимый для работы EXTI 
+                RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+                // Сбросим возможно установленный бит прерывания EXTI_Line 
+                EXTI_ClearITPendingBit(static_cast<uint32_t>(pin_source));
+                // Инициализация EXTI
                 this->InitExti(EXTI_InitStructure_ptr);
-                this->InitInterrupt(NVIC_InitStructure_ptr);
+
+                __set_PRIMASK(primask);
+                __enable_irq();
+                return true;
+            }
+
+            /**
+             * @brief   Изменяет приоритет вектора IRQ данного пина.
+             * @param   preemption_priority Приоритет вытеснения.
+             * @param   sub_priority Подприоритет в текущей группировке NVIC.
+             * @note    Вызывать после InitPinExti(). Приоритет общий для всех линий этого вектора.
+             */
+            void SetInterruptPriority(uint8_t preemption_priority, uint8_t sub_priority){
+                irq_registration.SetInterruptPriority(preemption_priority, sub_priority);
             }
             
             /**
-             * @brief   Обработчик прерывания, вызываемый при срабатывании EXTI.
-             * @details Вызывает пользовательскую функцию external_irq_handler(), после чего
-             *          очищает флаг прерывания EXTI для данной линии.
+             * @brief   Статический переходник к пользовательскому обработчику EXTI.
+             * @note    Вызывается диспетчером после очистки pending-флага линии.
              */
-            void irq_handler(){
-                /*  Код для отработки прерывания  */
+            static void irq_handler(){
                 external_irq_handler();
-
-                EXTI_ClearFlag(static_cast<uint32_t>(pin_source));
             }
         };
     
