@@ -12,7 +12,8 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "GpioPin.hpp"
-#include "Consepts/ByteDecoder.hpp"
+#include "CheckUsartGPIO.hpp"
+#include "ByteDecoder.hpp"
 #include "stm32f30x_usart.h"
 #include "UsartDescriptor.hpp"
 
@@ -25,11 +26,15 @@ namespace STM_CppLib{
          * @tparam RxPin Тип вывода приёма.
          * @tparam Decoder Тип с методом void byte_processing(uint8_t).
          */
-        template<UsartTypes Type, STM_GPIO::GpioPinConcept RxPin, ByteDecoder Decoder>
+        template<UsartTypes Type, STM_GPIO::GpioPinConcept RxPin, ByteDecoderConcept Decoder>
         class UsartRxChannel{
             using descriptor_t = UsartDescriptor<Type>;
 
-            static_assert(RxPin::get_pin_source() < 16, "Invalid USART RX pin");
+            static_assert(
+                is_usart_rx_gpio(Type, RxPin::get_port(), RxPin::get_pin_source()),
+                "Selected GPIO does not support RX for this USART"
+            );
+            
             static_assert(std::default_initializable<Decoder>, "USART decoder must be default-initializable");
 
             USART_TypeDef* const usart = descriptor_t::get_usart(); ///< Регистры аппаратного модуля
@@ -45,7 +50,10 @@ namespace STM_CppLib{
             bool read_byte(uint8_t& byte){
                 const uint32_t status = usart->ISR;
                 const bool received = (status & USART_ISR_RXNE) != 0;
-                if (received){ byte = static_cast<uint8_t>(USART_ReceiveData(usart)); }
+                // А что проверяется то?
+                if (received){ 
+                    byte = static_cast<uint8_t>(USART_ReceiveData(usart)); 
+                }
                 const uint32_t errors = status & (USART_ISR_PE | USART_ISR_FE | USART_ISR_NE | USART_ISR_ORE);
                 if (errors != 0){ usart->ICR = errors; }
                 return received && (status & (USART_ISR_PE | USART_ISR_FE | USART_ISR_NE)) == 0;
@@ -65,8 +73,12 @@ namespace STM_CppLib{
                 pin_rx.InitPin(GPIO_Mode_AF, GPIO_PuPd_UP);
                 GPIO_PinAFConfig(
                     STM_GPIO::GPIO_PortDescriptor<RxPin::get_port()>::get_GPIO_Type(),
-                    RxPin::get_pin_source(), descriptor_t::AF);
+                    RxPin::get_pin_source(), 
+                    descriptor_t::AF
+                );
                 USART_RequestCmd(usart, USART_Request_RXFRQ, ENABLE);
+                
+                // [Question] Что тут делаем?
                 usart->ICR = USART_ICR_PECF | USART_ICR_FECF | USART_ICR_NCF | USART_ICR_ORECF;
             }
 

@@ -30,7 +30,7 @@ namespace STM_CppLib{
          * @note Управление и отправка только из main. Декодер не отправляет в TX-очередь.
          */
         template<UsartTypes Type, STM_GPIO::GpioPinConcept TxPin, STM_GPIO::GpioPinConcept RxPin,
-                 ByteDecoder Decoder, uint32_t TxBufferSize = 256>
+                 ByteDecoderConcept Decoder, uint32_t TxBufferSize = 256>
         class UsartTxRx{
             friend class UsartIRQ<UsartTxRx, Type>;
 
@@ -39,14 +39,14 @@ namespace STM_CppLib{
 
             UsartHardware<Type> hardware; ///< Общая настройка и состояние USART
             tx_channel_t tx; ///< TX-пин, очередь и аппаратная передача
-            rx_channel_t rx; ///< RX-пин, аппаратный приём и декодер
+            rx_channel_t rx_channel; ///< RX-пин, аппаратный приём и декодер
             UsartIRQ<UsartTxRx, Type> irq_registration; ///< Одна регистрация для обоих направлений
 
             /** @brief Обслуживает TX до пользовательского RX-декодера, не задерживая ожидающий TXE. */
             void irq_handler(){
                 if (!hardware.is_started()){ return; }
                 tx.handle_interrupt();
-                rx.handle_interrupt();
+                rx_channel.handle_interrupt();
             }
 
         public:
@@ -58,13 +58,14 @@ namespace STM_CppLib{
             UsartTxRx& operator=(UsartTxRx&&) = delete;
 
             /**
-             * @brief Настраивает или переинициализирует оба направления и запускает устройство.
+             * @brief Настраивает или переинициализирует оба направления, оставляя устройство остановленным.
              * @param config Скорость, формат слова и режим выборки;
              *               значения по умолчанию — 115200, 8N1, Oversampling16.
              * @return false без изменения настроек при занятом ресурсе, активном аппаратном
              *         TX/RX или неподдерживаемой конфигурации. Непустая очередь не мешает Init().
              * @note Очередь и декодер сохраняются, ожидающие данные TX используют новые настройки.
              *       Непрочитанное аппаратное слово RX при перенастройке сбрасывается.
+             *       Для запуска устройства необходимо вызвать Start().
              */
             bool Init(const UsartConfig& config){
                 if (!hardware.validate_baudrate(config.baudrate, config.oversampling)){ return false; }
@@ -74,15 +75,15 @@ namespace STM_CppLib{
                 selected_config.direction = tx_channel_t::DIRECTION | rx_channel_t::DIRECTION;
                 hardware.configure(selected_config);
                 tx.init();
-                rx.init();
-                return Start();
+                rx_channel.init();
+                return true;
             }
 
-            /** @brief Возобновляет оба направления и очередь; возвращает false до успешного Init(). */
+            /** @brief Запускает оба направления и очередь после Init() или Stop(); false до успешного Init(). */
             bool Start(){
                 if (hardware.is_started()){ return true; }
                 if (!hardware.start()){ return false; }
-                rx.enable_interrupts();
+                rx_channel.enable_interrupts();
                 tx.resume();
                 irq_registration.enable();
                 return true;
@@ -93,12 +94,12 @@ namespace STM_CppLib{
                 const uint32_t primask = __get_PRIMASK();
                 __disable_irq();
                 if (hardware.is_started()){
-                    if (tx.is_busy() || rx.is_busy()){
+                    if (tx.is_busy() || rx_channel.is_busy()){
                         __set_PRIMASK(primask);
                         return false;
                     }
                     tx.disable_interrupts();
-                    rx.disable_interrupts();
+                    rx_channel.disable_interrupts();
                     hardware.stop();
                 }
                 __set_PRIMASK(primask);
@@ -109,7 +110,7 @@ namespace STM_CppLib{
             bool IsTxBusy() const { return hardware.is_started() && tx.is_busy(); }
 
             /** @brief Проверяет приём отдельного слова, а не пакета и не наличие байта в RDR. */
-            bool IsRxBusy() const { return hardware.is_started() && rx.is_busy(); }
+            bool IsRxBusy() const { return hardware.is_started() && rx_channel.is_busy(); }
 
             /** @brief Возвращает число свободных байтов в программной TX-очереди; вызывать из main. */
             uint32_t GetTxFreeSpace() const { return tx.free_space(); }

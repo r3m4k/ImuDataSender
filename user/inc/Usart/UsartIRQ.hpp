@@ -20,10 +20,11 @@ namespace STM_CppLib{
         /** 
          * @brief Единственный CRTP-переходник одного аппаратного вектора USART. 
          */
+        // [Question] А зачем вообще этот класс? Вроде его логика норм будет напрямую в UsartIRQ
         template<IRQn_Type IRQn>
         class UsartIRQVector: private BaseIRQDevice<UsartIRQVector<IRQn>, IRQn>{
 
-            template<typename Device, UsartTypes Type> friend class UsartIRQ;
+            template<typename UsartDevice, UsartTypes Type> friend class UsartIRQ;
             friend class BaseIRQDevice<UsartIRQVector<IRQn>, IRQn>;
 
             /** 
@@ -35,7 +36,10 @@ namespace STM_CppLib{
              * @brief Установка вектора при ещё запрещённом канале NVIC. 
              */
             static void init_vector(){
-                static UsartIRQVector vector;
+                // [Question] Зачем? если только ради выполнения конструктора, то можно
+                // this->irq_device_ptr = this; написать здесь напрямую
+                static UsartIRQVector vector;   
+
                 vector.disable_interrupt();
                 vector.register_interrupt();
                 vector.set_interrupt_priority();
@@ -45,19 +49,21 @@ namespace STM_CppLib{
             void irq_handler(){ UsartIRQDispatcher::dispatch_irq(IRQn); }
         };
 
+        // [Question] Зачем тут UsartDevice? Если это относится именно к USART, то лучше 
+        // использовать связанное название.
         /**
          * @brief  Регистрация одного долгоживущего объекта на аппаратном USART.
-         * @tparam Device   Тип с методом irq_handler().
+         * @tparam UsartDevice   Тип с методом irq_handler().
          * @tparam Type     Аппаратный USART/UART.
          */
-        template<typename Device, UsartTypes Type>
+        template<typename UsartDevice, UsartTypes Type>
         class UsartIRQ{
             using descriptor_t = UsartDescriptor<Type>;
             
             bool registered = false;    ///< Устройство успешно получило аппаратный ресурс
 
             /** @brief Вызывает конкретное устройство по сохранённому стабильному адресу. */
-            static void dispatch_device(void* owner){ static_cast<Device*>(owner)->irq_handler(); }
+            static void dispatch_usart(void* usart_ptr){ static_cast<UsartDevice*>(usart_ptr)->irq_handler(); }
 
         public:
             /** @brief Создаёт объект без регистрации и настройки NVIC. */
@@ -72,18 +78,19 @@ namespace STM_CppLib{
              * @return false при другой паре владелец/переходник на занятом ресурсе.
              * @note Повтор той же пары успешен и сохраняет приоритет общего IRQ.
              */
-            bool register_device(Device& device){
+            bool register_device(UsartDevice& device){
                 const uint32_t primask = __get_PRIMASK();
                 __disable_irq();
                 auto& entry = UsartIRQDispatcher::registrations[descriptor_t::UART_INDEX];
-                if (entry.owner != nullptr &&
-                    (entry.owner != &device || entry.handler != &dispatch_device)){
+                // [Question] Зачем тут entry.handler != &dispatch_usart?
+                if (entry.usart_ptr != nullptr &&
+                    (entry.usart_ptr != &device || entry.handler != &dispatch_usart)){
                     __set_PRIMASK(primask);
                     return false;
                 }
-                entry.owner = &device;
-                entry.handler = &dispatch_device;
-                const uint8_t index = UsartIRQDispatcher::vector_index(descriptor_t::IRQn);
+                entry.usart_ptr = &device;
+                entry.handler = &dispatch_usart;
+                const uint8_t index = UsartIRQDispatcher::usart_irq_vector_index(descriptor_t::IRQn);
                 if (!UsartIRQDispatcher::initialized_vectors[index]){
                     UsartIRQVector<descriptor_t::IRQn>::init_vector();
                     UsartIRQDispatcher::initialized_vectors[index] = true;

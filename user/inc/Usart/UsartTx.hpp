@@ -50,11 +50,12 @@ namespace STM_CppLib{
             UsartTx& operator=(UsartTx&&) = delete;
 
             /**
-             * @brief Настраивает или переинициализирует USART и запускает сохранённую очередь.
+             * @brief Настраивает или переинициализирует USART, оставляя его остановленным.
              * @param config Скорость, формат слова и режим выборки;
              *               значения по умолчанию — 115200, 8N1, Oversampling16.
              * @return false без изменения настроек при занятом ресурсе, активном аппаратном
              *         TX или неподдерживаемой конфигурации. Непустая очередь не мешает Init().
+             * @note Очередь сохраняется. Для запуска передачи необходимо вызвать Start().
              */
             bool Init(const UsartConfig& config){
                 if (!hardware.validate_baudrate(config.baudrate, config.oversampling)){ return false; }
@@ -64,10 +65,10 @@ namespace STM_CppLib{
                 selected_config.direction = tx_channel_t::DIRECTION;
                 hardware.configure(selected_config);
                 tx.init();
-                return Start();
+                return true;
             }
 
-            /** @brief Возобновляет работу после Stop(); возвращает false до успешного Init(). */
+            /** @brief Запускает USART после Init() или Stop(); возвращает false до успешного Init(). */
             bool Start(){
                 if (hardware.is_started()){ return true; }
                 if (!hardware.start()){ return false; }

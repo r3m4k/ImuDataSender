@@ -12,6 +12,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "GpioPin.hpp"
+#include "CheckUsartGPIO.hpp"
 #include "SpscRingBuffer.hpp"
 #include "stm32f30x_usart.h"
 #include "UsartDescriptor.hpp"
@@ -29,7 +30,10 @@ namespace STM_CppLib{
         class UsartTxChannel{
             using descriptor_t = UsartDescriptor<Type>;
 
-            static_assert(TxPin::get_pin_source() < 16, "Invalid USART TX pin");
+            static_assert(
+                is_usart_tx_gpio(Type, TxPin::get_port(), TxPin::get_pin_source()),
+                "Selected GPIO does not support TX for this USART"
+            );
 
             USART_TypeDef* const usart = descriptor_t::get_usart(); ///< Регистры аппаратного модуля
             TxPin pin_tx; ///< Вывод передачи

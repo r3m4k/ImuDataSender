@@ -47,15 +47,16 @@ namespace STM_CppLib{
                 RCC_GetClocksFreq(&clocks);
 
                 const uint32_t uart_freq = clocks.*descriptor_t::CLOCK_FREQUENCY;
-                    switch (oversampling){
-                        case UsartOversampling::Oversampling16:
-                            scaled_freq = uart_freq;
-                            break;
+                uint32_t scaled_freq = 0;
+                switch (oversampling){
+                    case UsartOversampling::Oversampling16:
+                        scaled_freq = uart_freq;
+                        break;
 
-                        case UsartOversampling::Oversampling8:
-                            scaled_freq = 2U * uart_freq;
-                            break;
-                    }
+                    case UsartOversampling::Oversampling8:
+                        scaled_freq = 2U * uart_freq;
+                        break;
+                }
                 // Та же схема округления, что в USART_Init() используемой SPL.
                 const uint32_t divider = scaled_freq / baudrate_value +
                     ((scaled_freq % baudrate_value >= baudrate_value / 2U) ? 1U : 0U);
