@@ -81,7 +81,7 @@ volatile bool ready_flag = false;
 STM_CppLib::Leds leds;
 
 // Обработчик поступивших команд
-Commands::CommandManager command_manager;
+Commands::ProjectCommandManager command_manager;
 
 // Интерфейс связи: USART1 на пинах PC4 (TX) и PC5 (RX)
 using PinTX_t = STM_CppLib::STM_GPIO::GPIO_Pin
