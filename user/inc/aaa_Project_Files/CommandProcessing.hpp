@@ -3,10 +3,9 @@
  * @author  Романовский Роман
  * @brief   Модуль обработки команд для встроенной системы.
  *
- * @details Регистрирует поддерживаемые команды и предоставляет менеджер
+ * @details Регистрирует поддерживаемые команды и задаёт тип менеджера
  *          для их сопоставления и выполнения. Структурные классы команд
- *          (CommandHandler, Command, Command<N>, ByteCommand<N>,
- *          TextCommand<N>) определены в CommandStructure.hpp.
+ *          определены в Command.hpp, шаблон менеджера — в CommandManager.hpp.
  *
  *          Поддерживаются два вида команд:
  *          - Срочные (urgent) — выполняются немедленно в контексте декодера
@@ -16,8 +15,8 @@
  *
  *          В этом файле определены:
  *          - inline-объекты ByteCommand/TextCommand (поддерживаемые команды);
- *          - CommandManager — контейнер со списками urgent/deferred команд
- *                             и очередью для отложенного исполнения.
+ *          - массивы указателей на срочные и отложенные команды;
+ *          - ProjectCommandManager — менеджер с этими списками команд.
  *************************************************************************** */
 
 /* Define to prevent recursive inclusion -------------------------------------*/
@@ -25,12 +24,9 @@
 #define COMMAND_PROCESSING_HPP
 
 /* Includes ------------------------------------------------------------------*/
-#include <stdint.h>
-
 #include "main.h"
-#include "Messages.hpp"
-#include "SpscRingBuffer.hpp"
-#include "CommandStructure.hpp"
+#include "Command.hpp"
+#include "CommandManager.hpp"
 
 /* Defines -------------------------------------------------------------------*/
 
@@ -89,80 +85,29 @@ namespace Commands{
     // -------------------------------------------------------------------------
 
     /**
-     * @brief   Менеджер поддерживаемых команд.
-     * @details Хранит два статических списка указателей на Command:
-     *          urgent_commands (исполняются в IRQ-контексте немедленно)
-     *          и deferred_commands (помещаются в очередь для исполнения в main).
-     *          Также владеет очередью CommandHandler для отложенных команд.
-     * @note    При добавлении новой команды (ByteCommand или TextCommand)
-     *          не забыть включить её в соответствующий массив ниже.
+     * @brief   Список отложенных команд (помещаются в очередь).
+     * @note    Новую отложенную команду необходимо включить в этот массив.
      */
-    class CommandManager{
-    public:
-        /**
-         * @brief   Список срочных команд (исполняются в контексте декодера).
-         */
-        inline static const Command* urgent_commands[] = {
-            &Restart_Cmd
-        };
-
-        /**
-         * @brief   Список отложенных команд (помещаются в очередь).
-         */
-        inline static const Command* deferred_commands[] = {
-            &Set_FooStage_Cmd,
-            &Set_MeasureStage_Cmd,
-            &Send_Confirm_Cmd,
-            &Send_Handshake_Ack_Cmd,
-            &Send_Heartbeat_Ack_Cmd
-        };
-
-        /**
-         * @brief   Очередь отложенных команд для исполнения в main.
-         * @details Используется SPSC-очередь: put() вызывается из контекста
-         *          USART IRQ (через DecoderImu::process_command_packet),
-         *          get() — из основного цикла main.
-         */
-        Containers::SpscRingBuffer<CommandHandler, 8> command_queue;
-
-        /**
-         * @brief   Поиск срочной команды по коду.
-         * @param   code   View на байты кода (обычно data-секция пакета).
-         * @return  Указатель на найденную Command или nullptr.
-         */
-        const Command* find_urgent(const BinaryData::MutableByteView& code) const {
-            for (const Command* cmd : urgent_commands){
-                if (cmd->code == code){
-                    return cmd;
-                }
-            }
-            return nullptr;
-        }
-
-        /**
-         * @brief   Поиск отложенной команды по коду.
-         * @param   code   View на байты кода (обычно data-секция пакета).
-         * @return  Указатель на найденную Command или nullptr.
-         */
-        const Command* find_deferred(const BinaryData::MutableByteView& code) const {
-            for (const Command* cmd : deferred_commands){
-                if (cmd->code == code){
-                    return cmd;
-                }
-            }
-            return nullptr;
-        }
-
-        /**
-         * @brief   Добавление команды в очередь отложенного исполнения.
-         * @param   command   Ссылка на команду (только её handler копируется
-         *                    в очередь).
-         * @return  true, если команда добавлена; false, если очередь заполнена.
-         */
-        bool add_to_queue(const Command& command){
-            return command_queue.put(command.handler);
-        }
+    inline constexpr const Command* deferred_commands[] = {
+        &Set_FooStage_Cmd,
+        &Set_MeasureStage_Cmd,
+        &Send_Confirm_Cmd,
+        &Send_Handshake_Ack_Cmd,
+        &Send_Heartbeat_Ack_Cmd
     };
+
+    /**
+     * @brief   Список срочных команд (исполняются в контексте декодера).
+     * @note    Новую срочную команду необходимо включить в этот массив.
+     */
+    inline constexpr const Command* urgent_commands[] = {
+        &Restart_Cmd
+    };
+
+    /**
+     * @brief   Тип менеджера с командами данного приложения.
+     */
+    using ProjectCommandManager = CommandManager<deferred_commands, urgent_commands>;
 
 } // namespace Commands
 

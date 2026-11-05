@@ -41,7 +41,7 @@
 /**
  * @brief   Внешний менеджер команд, определённый в пользовательском коде.
  */
-extern Commands::CommandManager command_manager;
+extern Commands::ProjectCommandManager command_manager;
 
 // -----------------------------------------------------------------------------
 
