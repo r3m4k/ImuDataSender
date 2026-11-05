@@ -1,9 +1,9 @@
+.PHONY: __build_stm32f3x_usb_lib __rebuild_stm_usb_lib __clean_usb_lib
+
 # ---------------------------
-# STM_USB_LIB 
+# Компоненты USB
 # ---------------------------
 
-STM_USB_LIB_NAME = libstm_usb_lib.a
-# LIBS += -L./${BIN_PLACE} -lstm_usb_lib
 OBJECTS += ${USB_OBJ}
 
 SUBDIRS_OBJ += ${USB_OBJ_DIR}
@@ -45,35 +45,31 @@ $(patsubst ${USB_SRC_DIR}/%.cpp,${USB_OBJ_DIR}/%.opp,${USB_SRC_CPP})
 # Правила для сборки STM32_USB_LIB
 # --------------------------------
 
-__rebuild_stm_usb_lib: __clean_usb_lib __build_stm32f3x_usb_lib
+__rebuild_stm_usb_lib: __clean_usb_lib
+	+@"$(MAKE)" -f "$(MAKEFILE_ENTRY)" __build_stm32f3x_usb_lib
 	@echo # ---------------------------
-	@echo Rebuilding ${STM_USB_LIB_NAME} completed successfully
+	@echo Rebuilding USB objects completed successfully
 	@echo # ---------------------------
 
 # ---------------------------
 
 __build_stm32f3x_usb_lib: ${USB_OBJ}
-# @echo # ---------------------------
-# @echo Building static library ${STM_USB_LIB_NAME}
-# @echo ar rcs ${BIN_PLACE}/${STM_USB_LIB_NAME} $${USB_OBJ}
-# @ar rcs ${BIN_PLACE}/${STM_USB_LIB_NAME} ${USB_OBJ}
-# @echo # ---------------------------
-	
-# ---------------------------
-${USB_OBJ_DIR}/%.o: ${USB_SRC_DIR}/%.c
-	@echo Compiling $@ from $<
-	@${CC} ${GCC_FLAGS} ${DEFINES} ${INCLUDES} $< -o $@
 
-${USB_OBJ_DIR}/%.opp: ${USB_SRC_DIR}/%.cpp
+# ---------------------------
+${USB_OBJ_DIR}/%.o: ${USB_SRC_DIR}/%.c | ${USB_OBJ_DIR}
 	@echo Compiling $@ from $<
-	@${CP} ${GPP_FLAGS} ${DEFINES} ${INCLUDES} $< -o $@
+	@"${CC}" ${GCC_FLAGS} ${DEPFLAGS} ${DEFINES} ${INCLUDES} "$<" -o "$@"
+
+${USB_OBJ_DIR}/%.opp: ${USB_SRC_DIR}/%.cpp | ${USB_OBJ_DIR}
+	@echo Compiling $@ from $<
+	@"${CP}" ${GPP_FLAGS} ${DEPFLAGS} ${DEFINES} ${INCLUDES} "$<" -o "$@"
 
 # ---------------------------
 
 __clean_usb_lib:
 	@echo # ---------------------------
-	@echo Deleting ${STM_STD_LIB_NAME} and its object files
-	@rm -f ${USB_OBJ} ${BIN_PLACE}/${STM_USB_LIB_NAME}
+	@echo Deleting USB objects and dependencies
+	@$(call delete_files,${USB_OBJ} $(addsuffix .d,${USB_OBJ}))
 	@echo # ---------------------------
 
 # ---------------------------

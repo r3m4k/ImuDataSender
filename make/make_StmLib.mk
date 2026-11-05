@@ -1,9 +1,9 @@
+.PHONY: __build_stm32f3x_spl_lib __rebuild_stm_std_lib __clean_stm_std_lib
+
 # ---------------------------
-# STM_STD_LIB
+# Системные компоненты STM32
 # ---------------------------
 
-STM_STD_LIB_NAME = libstm_std_lib.a
-# LIBS += -L./${BIN_PLACE} -lstm_std_lib
 OBJECTS += ${STM_SPL_LIB_OBJ}
 
 SUBDIRS_OBJ += \
@@ -105,9 +105,10 @@ $(patsubst ${CORTEXM_DIR}/%.c, ${CORTEXM_OBJ_DIR}/%.o,${CORTEXM_SRC})
 # Правила для сборки STM32_SPL_LIB
 # --------------------------------
 
-__rebuild_stm_std_lib: clean_stm_std_lib  __build_stm32f3x_spl_lib
+__rebuild_stm_std_lib: __clean_stm_std_lib
+	+@"$(MAKE)" -f "$(MAKEFILE_ENTRY)" __build_stm32f3x_spl_lib
 	@echo # ---------------------------
-	@echo Rebuilding ${STM_USB_LIB_NAME} completed successfully
+	@echo Rebuilding STM32 system objects completed successfully
 	@echo # ---------------------------
 
 # ---------------------------
@@ -116,36 +117,36 @@ __build_stm32f3x_spl_lib: ${STM_SPL_LIB_OBJ}
 
 # ---------------------------
 
-${STM32_PERIPH_OBJ_DIR}/%.o: ${STM32_PERIPH_DIR}/%.c
+${STM32_PERIPH_OBJ_DIR}/%.o: ${STM32_PERIPH_DIR}/%.c | ${STM32_PERIPH_OBJ_DIR}
 	@echo Compiling $@ from $<
-	@${CC} ${GCC_FLAGS} ${DEFINES} ${INCLUDES} $< -o $@
+	@"${CC}" ${GCC_FLAGS} ${DEPFLAGS} ${DEFINES} ${INCLUDES} "$<" -o "$@"
 
-${CMSIS_OBJ_DIR}/%.o: ${CMSIS_DIR}/%.c
+${CMSIS_OBJ_DIR}/%.o: ${CMSIS_DIR}/%.c | ${CMSIS_OBJ_DIR}
 	@echo Compiling $@ from $<
-	@${CC} ${GCC_FLAGS} ${DEFINES} ${INCLUDES} $< -o $@
+	@"${CC}" ${GCC_FLAGS} ${DEPFLAGS} ${DEFINES} ${INCLUDES} "$<" -o "$@"
 
-${NEWLIB_OBJ_DIR}/%.o: ${NEWLIB_DIR}/%.c
+${NEWLIB_OBJ_DIR}/%.o: ${NEWLIB_DIR}/%.c | ${NEWLIB_OBJ_DIR}
 	@echo Compiling $@ from $<
-	@${CC} ${GCC_FLAGS} ${DEFINES} ${INCLUDES} $< -o $@
+	@"${CC}" ${GCC_FLAGS} ${DEPFLAGS} ${DEFINES} ${INCLUDES} "$<" -o "$@"
 
-${NEWLIB_OBJ_DIR}/%.opp: ${NEWLIB_DIR}/%.cpp
+${NEWLIB_OBJ_DIR}/%.opp: ${NEWLIB_DIR}/%.cpp | ${NEWLIB_OBJ_DIR}
 	@echo Compiling $@ from $<
-	@${CP} ${GPP_FLAGS} ${DEFINES} ${INCLUDES} $< -o $@
+	@"${CP}" ${GPP_FLAGS} ${DEPFLAGS} ${DEFINES} ${INCLUDES} "$<" -o "$@"
 
-${DIAG_OBJ_DIR}/%.o: ${DIAG_DIR}/%.c
+${DIAG_OBJ_DIR}/%.o: ${DIAG_DIR}/%.c | ${DIAG_OBJ_DIR}
 	@echo Compiling $@ from $<
-	@${CC} ${GCC_FLAGS} ${DEFINES} ${INCLUDES} $< -o $@
+	@"${CC}" ${GCC_FLAGS} ${DEPFLAGS} ${DEFINES} ${INCLUDES} "$<" -o "$@"
 
-${CORTEXM_OBJ_DIR}/%.o: ${CORTEXM_DIR}/%.c
+${CORTEXM_OBJ_DIR}/%.o: ${CORTEXM_DIR}/%.c | ${CORTEXM_OBJ_DIR}
 	@echo Compiling $@ from $<
-	@${CC} ${GCC_FLAGS} ${DEFINES} ${INCLUDES} $< -o $@
+	@"${CC}" ${GCC_FLAGS} ${DEPFLAGS} ${DEFINES} ${INCLUDES} "$<" -o "$@"
 
 # ---------------------------
 
 __clean_stm_std_lib:
 	@echo # ---------------------------
-	@echo Deleting ${STM_STD_LIB_NAME} and its object files
-	@rm -f ${STM_SPL_LIB_OBJ} ${BIN_PLACE}/${STM_STD_LIB_NAME}
+	@echo Deleting STM32 system objects and dependencies
+	@$(call delete_files,${STM_SPL_LIB_OBJ} $(addsuffix .d,${STM_SPL_LIB_OBJ}))
 	@echo # ---------------------------
 
 # ---------------------------

@@ -1,6 +1,18 @@
 # ---------------------------
-# Building utils
+# Вспомогательные правила сборки
 # ---------------------------
+
+ifeq ($(SYSTEM), windows)
+SHELL := cmd.exe
+.SHELLFLAGS := /D /C
+create_dir = if not exist "$(subst /,\,$(1))" mkdir "$(subst /,\,$(1))"
+delete_files = for %f in ($(foreach file,$(1),"$(subst /,\,$(file))")) do @if exist "%~f" del /f /q "%~f"
+else ifeq ($(SYSTEM), linux)
+create_dir = mkdir -p "$(1)"
+delete_files = rm -f $(foreach file,$(1),"$(file)")
+endif
+
+.PHONY: __info __linking __create_dirs __create_bin_dir __create_subdirs
 
 __info:
 	@echo # ---------------------------
@@ -16,45 +28,30 @@ __info:
 	@echo Obj dirs: ${SUBDIRS_OBJ}
 	@echo # ---------------------------
 
+# --------------------------------
+# Линковка и формирование HEX
+# --------------------------------
+
+__linking: ${BIN_PLACE}/${PROGRAM_NAME}.hex
+
+${BIN_PLACE}/${BINARY}: | ${BIN_PLACE}
+	@echo Building "$@", map "${BIN_PLACE}/${PROGRAM_NAME}.map"
+	@"${CC}" ${LINK_FLAGS} -o "$@" ${OBJECTS} ${LIBS}
+	@"${GCC_PLACE}/bin/arm-none-eabi-size" --format=berkeley "$@"
+
+${BIN_PLACE}/${PROGRAM_NAME}.hex: ${BIN_PLACE}/${BINARY}
+	@echo Forming "$@"
+	@"${GCC_PLACE}/bin/arm-none-eabi-objcopy" -O ihex "$<" "$@"
 
 # --------------------------------
-# Линковка проекта
-# --------------------------------
-
-__linking: __info
-	@echo Building "${BIN_PLACE}/${BINARY}", Memory card "${BIN_PLACE}/${PROGRAM_NAME}.map"
-	@$(CC) ${LINK_FLAGS} -o ${BIN_PLACE}/$(BINARY) $(OBJECTS) ${LIBS}
-	@echo $(CC) LINK_FLAGS -o ${BIN_PLACE}/$(BINARY) OBJECTS LIBS
-	@echo # ---------------------------
-	@echo ${BIN_PLACE}/${BINARY} info:
-	@${GCC_PLACE}/bin/arm-none-eabi-size --format=berkeley ${BIN_PLACE}/${BINARY}
-	@echo # ---------------------------
-	@echo Forming "${BIN_PLACE}/${PROGRAM_NAME}.hex"
-	@${GCC_PLACE}/bin/arm-none-eabi-objcopy -O ihex ${BIN_PLACE}/${BINARY} ${BIN_PLACE}/${PROGRAM_NAME}.hex 
-
-
-# --------------------------------
-# Создание необходимых директорий
+# Создание необходимых каталогов
 # --------------------------------
 
 __create_dirs: __create_bin_dir __create_subdirs
-	@echo # ---------------------------
-	@echo All directories are created
-	@echo # ---------------------------
 
-# Функция для создания директории с проверкой её наличие перед этим
-ensure_dir =
-ifeq ($(SYSTEM), windows)
-	ensure_dir = $(if $(wildcard $(1)/.),$(info Directory "$(1)" already exists),$(shell mkdir $(subst /,\,$(1))))
-else ifeq ($(SYSTEM), linux)
-	ensure_dir = $(if $(wildcard $(1)/.),$(info Directory "$(1)" already exists),$(shell mkdir $(1)))
-endif
+__create_subdirs:
 
-__create_subdirs: __create_bin_dir
-	$(foreach dir, ${SUBDIRS_OBJ}, $(call ensure_dir,$(dir)))
+__create_bin_dir: ${BIN_PLACE}
 
-__create_bin_dir:
-	$(call ensure_dir,${BIN_PLACE})
-
-
-# --------------------------------
+${BIN_PLACE}:
+	@$(call create_dir,$@)

@@ -1,3 +1,5 @@
+.PHONY: __build_user __rebuild_user __clean_user
+
 # ---------------------------
 # User files
 # ---------------------------
@@ -29,22 +31,23 @@ $(patsubst ${USER_DIR}/%.cpp, ${USER_OBJ_DIR}/%.opp,${USER_SRC_CPP}) \
 
 # ----------------------------
 
-${USER_OBJ_DIR}/%.o: ${USER_DIR}/%.c
+${USER_OBJ_DIR}/%.o: ${USER_DIR}/%.c | ${USER_OBJ_DIR}
 	@echo Compiling $@ from $<
-	@${CC} ${GCC_FLAGS} ${DEFINES} ${USER_DEFINES} ${INCLUDES} $< -o $@
+	@"${CC}" ${GCC_FLAGS} ${DEPFLAGS} ${DEFINES} ${USER_DEFINES} ${INCLUDES} "$<" -o "$@"
 
-${USER_OBJ_DIR}/%.opp: ${USER_DIR}/%.cpp
+${USER_OBJ_DIR}/%.opp: ${USER_DIR}/%.cpp | ${USER_OBJ_DIR}
 	@echo Compiling $@ from $<
-	@${CP} ${GPP_FLAGS} ${DEFINES} ${USER_DEFINES} ${INCLUDES} $< -o $@
+	@"${CP}" ${GPP_FLAGS} ${DEPFLAGS} ${DEFINES} ${USER_DEFINES} ${INCLUDES} "$<" -o "$@"
 
 # ---------------------------
 
 __build_user: ${USER_OBJ}
 
-__rebuild_user: __clean_user __build_user
+__rebuild_user: __clean_user
+	+@"$(MAKE)" -f "$(MAKEFILE_ENTRY)" __build_user
 
 __clean_user:
 	@echo Deleting user's object files and generated files
-	@rm -f ${USER_OBJ} ${BIN_PLACE}/${BINARY} ${BIN_PLACE}/${PROGRAM_NAME}.hex ${BIN_PLACE}/${PROGRAM_NAME}.map
+	@$(call delete_files,${USER_OBJ} $(addsuffix .d,${USER_OBJ}) ${BIN_PLACE}/${BINARY} ${BIN_PLACE}/${PROGRAM_NAME}.hex ${BIN_PLACE}/${PROGRAM_NAME}.map)
 
 # --------------------------------

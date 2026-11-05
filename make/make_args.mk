@@ -5,13 +5,14 @@
 # ОС, на которой собирается проект
 # SYSTEM - переменная, задаваемая при запуске makefile
 # Зададим её тут, чтобы при запуске makefile из командной строки не задавать её
-SYSTEM := windows	
+SYSTEM := windows
 
 # Названеи проекта
 PROGRAM_NAME := ImuDataSender
 
-# Директория с исходным кодом относительно Makefile.mk
-SOURCE_DIR = ../../Embedded
+# Корень проекта относительно рабочего каталога Make.
+# Скрипты запускают Make из корня проекта.
+SOURCE_DIR = .
 
 # Название итогового исполняемого файла
 BINARY = ${PROGRAM_NAME}.elf
@@ -54,13 +55,12 @@ DEFINES= \
 
 GCC_FLAGS = -std=gnu11 ${COMPILER_FLAGS} -c
 
+# Зависимости заголовков сохраняются отдельно для каждого C/C++ объекта.
+DEPFLAGS = -MMD -MP -MF "$@.d" -MQ "$@"
+
 # флаги для g++
 # GPP_FLAGS = -std=gnu++11 ${COMPILER_FLAGS} -c -fabi-version=0 -fno-exceptions -fno-rtti -fno-use-cxa-atexit -fno-threadsafe-statics
 GPP_FLAGS = -std=c++20 ${COMPILER_FLAGS} -c -fno-exceptions -fno-rtti -fno-use-cxa-atexit -fno-threadsafe-statics
-
-# библиотеки компоновщика - должны быть последними в списке команды компоновщика
-# C:\SysGCC\arm-eabi\arm-none-eabi\lib\libm.a
-# LIBS = -L${GCC_PLACE}arm-none-eabi/lib/arm/v5te/hard -lm 
 
 INCLUDES = \
 -I"${GCC_PLACE}/arm-none-eabi/include" \
@@ -70,7 +70,7 @@ INCLUDES = \
 -I"${SOURCE_DIR}/user/inc/aaa_Project_Files" \
 -I"${SOURCE_DIR}/user/inc/Common" \
 -I"${SOURCE_DIR}/user/inc/Communication" \
--I"${SOURCE_DIR}/user/inc/Communication/Usart" \
+-I"${SOURCE_DIR}/user/inc/Concepts" \
 -I"${SOURCE_DIR}/user/inc/DataContainers" \
 -I"${SOURCE_DIR}/user/inc/Exti" \
 -I"${SOURCE_DIR}/user/inc/Filters" \
@@ -86,19 +86,23 @@ INCLUDES = \
 -I"${SOURCE_DIR}/system/include/additionally" \
 -I"${SOURCE_DIR}/system/USB_LIB/include"
 
+# Скрипты компоновщика входят в зависимости ELF-файла.
+LINKER_SCRIPTS = \
+${SOURCE_DIR}/ldscripts/mem.ld \
+${SOURCE_DIR}/ldscripts/libs.ld \
+${SOURCE_DIR}/ldscripts/sections.ld
+
 # флаги для линковщика
 LINK_FLAGS = ${COMPILER_FLAGS} \
--T "${SOURCE_DIR}/ldscripts/mem.ld" \
--T "${SOURCE_DIR}/ldscripts/libs.ld" \
--T "${SOURCE_DIR}/ldscripts/sections.ld" \
--L"${PROJ}ldscripts" \
+$(foreach script,${LINKER_SCRIPTS},-T "$(script)") \
+-L"${SOURCE_DIR}/ldscripts" \
 -nostartfiles -Xlinker --gc-sections -Wl,-Map,${BIN_PLACE}/${PROGRAM_NAME}.map # --specs=nano.specs 
 
 # Список используемых поддиректорий для сборки проекта
 SUBDIRS_OBJ =
 
 # Используемые в проекте библиотеки
-LIBS = -L${GCC_PLACE}/arm-none-eabi/arm/v5te/hard -lm
+LIBS = -L"${GCC_PLACE}/arm-none-eabi/arm/v5te/hard" -lm
 
 # Список всех объектных файлов проекта
 OBJECTS =
