@@ -1,5 +1,5 @@
 /** ****************************************************************************
- * @file    ByteDecoder.hpp
+ * @file    ByteDecoderConcept.hpp
  * @brief   Минимальный контракт обработчика входного байтового потока
  * @author  Романовский Роман
  * @date    Октябрь 2026
@@ -22,7 +22,7 @@ namespace STM_CppLib{
          * @tparam  T   Тип обработчика; наследование от BaseDecoder не требуется.
          */
         template<typename T>
-        concept ByteDecoder = requires(T& decoder, uint8_t byte){
+        concept ByteDecoderConcept = requires(T& decoder, uint8_t byte){
             { decoder.byte_processing(byte) } -> std::same_as<void>;
         };
 

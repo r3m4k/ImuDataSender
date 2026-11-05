@@ -1,20 +1,23 @@
 /** ****************************************************************************
- * @file    GpioPin.hpp
+ * @file    GpioPinConcept.hpp
+ * @brief   Концепт интерфейса вывода GPIO
  * @author  Романовский Роман
+ * @date    Ноябрь 2026
+ *
+ * @details Определяет требования к типу вывода GPIO для шаблонных компонентов.
+ *          Не требует подключения класса GPIO_Pin.
  **************************************************************************** */
 
-/* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef GPIO_PIN_HPP
-#define GPIO_PIN_HPP
+#ifndef GPIO_PIN_CONCEPT_HPP
+#define GPIO_PIN_CONCEPT_HPP
 
 /* Includes ------------------------------------------------------------------*/
 #include <concepts>
+#include <stdint.h>
 
-/* Defines -------------------------------------------------------------------*/
+#include "stm32f30x_gpio.h"
+#include "../Gpio/GpioPort.hpp"
 
-/* Global variables ----------------------------------------------------------*/
-
-// -----------------------------------------------------------------------------
 namespace STM_CppLib{
     namespace STM_GPIO{
 
@@ -23,8 +26,7 @@ namespace STM_CppLib{
          * @tparam  T   Тип, который проверяется на соответствие концепту.
          * @details Концепт требует наличия методов с сигнатурами,
          *          аналогичными методам класса GPIO_Pin из библиотеки STM_CppLib.
-         * @note    Для проверки InitPin используются типы параметров GPIOMode_TypeDef, GPIOPuPd_TypeDef
-         *          и указатель на GPIO_InitTypeDef; фактические значения не важны.
+         * @note    Проверяет выражения и типы результатов; аппаратное поведение не проверяется.
          */
         template <typename T>
         concept GpioPinConcept = requires(T pin) {
@@ -38,7 +40,8 @@ namespace STM_CppLib{
                           GPIOSpeed_TypeDef(),
                           GPIOOType_TypeDef()) } -> std::same_as<void>;
         };
+
     } // namespace STM_GPIO
 } // namespace STM_CppLib
 
-#endif /*   GPIO_PIN_HPP   */
+#endif /*   GPIO_PIN_CONCEPT_HPP   */
